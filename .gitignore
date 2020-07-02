@@ -132,3 +132,4 @@ dmypy.json
 data/*.png
 text/*.png
 ocr/*.png
+test/*.png

@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
 """
 Testing drop numbers (grab template locations/windows)
+
+Todo: 
 """
 
 import numpy as np
 import cv2
 import os, os.path
-from PIL import Image,ImageOps
 
 dropfiles = [name for name in os.listdir('data') if os.path.isfile(os.path.join('data',name))]
 droplabels = [name.split('.')[0].split(' ')[0] for name in dropfiles]
@@ -19,11 +20,20 @@ mask_yp = cv2.imread('templates/ypmask.png')
 tmpl_wp = cv2.imread('templates/wp.png')
 mask_wp = cv2.imread('templates/wpmask.png')
 
-#kern_wb = cv2.imread('templates/wbkern.png')
-#norm_wb = np.asarray(kern_wb,dtype=np.float)
-#norm_wb = norm_wb/np.sum(norm_wb)
+tmpl_gitem = cv2.imread('templates/gitem.png')
+tmpl_sitem = cv2.imread('templates/sitem.png')
 
 tmpl_tol = 0.97
+
+def corrtmpl(cvwnd,tmpl,mask):
+  h,w,_ = tmpl.shape
+  if mask is None:
+    res = cv2.matchTemplate(cvwnd, tmpl, cv2.TM_CCORR_NORMED)
+  else:
+    data = np.zeros((h,w,3),dtype=np.uint8)
+    res = cv2.matchTemplate(cvwnd, tmpl, cv2.TM_CCORR_NORMED, data, mask)
+  min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
+  return max_val, max_loc
 
 # Load image
 for i in range(len(dropfiles)):
@@ -38,27 +48,19 @@ for i in range(len(dropfiles)):
   cvframe = cvimage[50:,10:]
   # Sometimes it still breaks/confused on the 'Item' text
   # maybe another filter to get the bottom boundary?
+  max_val, max_loc = corrtmpl(cvframe, tmpl_gitem, None)
+  if max_val > 0.99:
+    cvframe = cvframe[:max_loc[1],:]
+  max_val, max_loc = corrtmpl(cvframe, tmpl_sitem, None)
+  if max_val > 0.99:
+    cvframe = cvframe[:max_loc[1],:]
   
   # Go through the different templates
-  h,w,_ = tmpl_wx.shape
-  data = np.zeros((h,w,3),dtype=np.uint8)
-  res = cv2.matchTemplate(cvframe, tmpl_wx, cv2.TM_CCORR_NORMED, data, mask_wx)
-  min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
-  corr[0] = max_val
+  corr[0], max_loc = corrtmpl(cvframe, tmpl_wx, mask_wx)
   locs.append(max_loc)
-  
-  h,w,_ = tmpl_wp.shape
-  data = np.zeros((h,w,3),dtype=np.uint8)
-  res = cv2.matchTemplate(cvframe, tmpl_wp, cv2.TM_CCORR_NORMED, data, mask_wp)
-  min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
-  corr[1] = max_val
+  corr[1], max_loc = corrtmpl(cvframe, tmpl_wp, mask_wp)
   locs.append(max_loc)
-  
-  h,w,_ = tmpl_yp.shape
-  data = np.zeros((h,w,3),dtype=np.uint8)
-  res = cv2.matchTemplate(cvframe, tmpl_yp, cv2.TM_CCORR_NORMED, data, mask_yp)
-  min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
-  corr[2] = max_val
+  corr[2], max_loc = corrtmpl(cvframe, tmpl_yp, mask_yp)
   locs.append(max_loc)
   
   # Figure out why things are breaking
@@ -89,7 +91,6 @@ for i in range(len(dropfiles)):
   cv2.imwrite(os.path.join('text',dropfiles[i]), cvwnd)
   
   # Try to do some OCR?
-  #cvocr = cv2.filter2D(cvwnd, -1, kern_wb)
   cvocr = cv2.cvtColor(cvwnd, cv2.COLOR_BGR2GRAY)
   cvocr = cv2.threshold(255-cvocr, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
   cv2.imwrite(os.path.join('ocr',dropfiles[i]), cvocr)
