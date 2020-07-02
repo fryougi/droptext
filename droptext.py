@@ -8,6 +8,7 @@ Todo:
 import numpy as np
 import cv2
 import os, os.path
+import time
 
 dropfiles = [name for name in os.listdir('data') if os.path.isfile(os.path.join('data',name))]
 droplabels = [name.split('.')[0].split(' ')[0] for name in dropfiles]
@@ -24,6 +25,8 @@ tmpl_gitem = cv2.imread('templates/gitem.png')
 tmpl_sitem = cv2.imread('templates/sitem.png')
 
 tmpl_tol = 0.97
+
+time_start = time.perf_counter()
 
 def corrtmpl(cvwnd,tmpl,mask):
   h,w,_ = tmpl.shape
@@ -95,6 +98,9 @@ for i in range(len(dropfiles)):
   cvocr = cv2.threshold(255-cvocr, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
   cv2.imwrite(os.path.join('ocr',dropfiles[i]), cvocr)
   
+time_end = time.perf_counter()
+seconds = time_end - time_start
+print("{:f}".format(seconds))
 
 # List of location windows
 # (xtol, ytol)
