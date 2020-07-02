@@ -8,6 +8,7 @@ Todo:
 import numpy as np
 import cv2
 import os, os.path
+from PIL import Image,ImageOps
 import time
 
 dropfiles = [name for name in os.listdir('data') if os.path.isfile(os.path.join('data',name))]
@@ -89,14 +90,23 @@ for i in range(len(dropfiles)):
   
   # windowing based on match location
   # probably brittle
-  cvwnd = cvframe[ymin-5:ymin+12,xmin:]
+  cvwnd = cvframe[ymin-3:ymin+11,xmin+1:-3]
   
   cv2.imwrite(os.path.join('text',dropfiles[i]), cvwnd)
   
   # Try to do some OCR?
-  cvocr = cv2.cvtColor(cvwnd, cv2.COLOR_BGR2GRAY)
-  cvocr = cv2.threshold(255-cvocr, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
-  cv2.imwrite(os.path.join('ocr',dropfiles[i]), cvocr)
+  cvhsv = cv2.cvtColor(cvwnd, cv2.COLOR_BGR2HSV)
+  lower_gold = np.array([20,50,130])
+  upper_gold = np.array([40,255,255])
+  mask = cv2.inRange(cvhsv, lower_gold, upper_gold)
+  # increase brightness of yellow areas
+  cvhsv[:,:,2][mask>0] += np.minimum(250-cvhsv[:,:,2][mask>0], 20)
+  cvhsv[:,:,1][mask>0] = 0
+  cvrgb = cv2.cvtColor(cvhsv, cv2.COLOR_HSV2BGR)
+  pimg = Image.fromarray(cvrgb)
+  pgray = ImageOps.grayscale(ImageOps.autocontrast(pimg))
+  cvgray = np.array(pgray)
+  cv2.imwrite(os.path.join('ocr',dropfiles[i]), cvgray)
   
 time_end = time.perf_counter()
 seconds = time_end - time_start

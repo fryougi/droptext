@@ -43,7 +43,7 @@ def corrtmpl(cvwnd,tmpl,mask):
   return max_val, max_loc
 
 # Load image
-i = 34
+i = 68
 fname = os.path.join('data',dropfiles[i])
 label = droplabels[i]
 
@@ -56,10 +56,10 @@ cvframe = cvimage[50:,10:]
 # Sometimes it still breaks/confused on the 'Item' text
 # maybe another filter to get the bottom boundary?
 max_val, max_loc = corrtmpl(cvframe, tmpl_gitem, None)
-if max_val > tmpl_tol:
+if max_val > 0.99:
   cvframe = cvframe[:max_loc[1],:]
 max_val, max_loc = corrtmpl(cvframe, tmpl_sitem, None)
-if max_val > tmpl_tol:
+if max_val > 0.99:
   cvframe = cvframe[:max_loc[1],:]
 
 # Go through the different templates
@@ -93,41 +93,30 @@ while xmin > 100:
 
 # windowing based on match location
 # probably brittle
-cvwnd = cvframe[ymin-5:ymin+12,xmin:]
+cvwnd = cvframe[ymin-3:ymin+11,xmin+1:-3]
 
 cv2.imwrite(os.path.join('test','text'+dropfiles[i],), cvwnd)
 
 # Try to do some OCR?
-pimg = Image.fromarray(cvwnd)
+cvhsv = cv2.cvtColor(cvwnd, cv2.COLOR_BGR2HSV)
+lower_gold = np.array([20,50,130])
+upper_gold = np.array([40,255,255])
+mask = cv2.inRange(cvhsv, lower_gold, upper_gold)
+# increase brightness of yellow areas
+cvhsv[:,:,2][mask>0] += np.minimum(250-cvhsv[:,:,2][mask>0], 20)
+cvhsv[:,:,1][mask>0] = 0
+cvrgb = cv2.cvtColor(cvhsv, cv2.COLOR_HSV2BGR)
+pimg = Image.fromarray(cvrgb)
 pgray = ImageOps.grayscale(ImageOps.autocontrast(pimg))
 cvgray = np.array(pgray)
+cv2.imwrite(os.path.join('test','ocr'+dropfiles[i]), cvgray)
+# thresholding sucks, use templates with masks instead
 
-cvthresh = cv2.threshold(cvgray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
 
-cvedges = cv2.Canny(cvgray, 50, 200)
-cvfilt = cv2.filter2D(cvgray, -1, norm_wb)
-cv2.imwrite(os.path.join('test','ocr'+dropfiles[i]), cvthresh)
-
-droptext = pytesseract.image_to_string(cvthresh, config=r'-l eng --oem 3 --psm 7')
-print(droptext)
 
 # List of location windows
 # (xtol, ytol)
 # (xmin, ymin, xmax, ymax)
-
-# Compute match
-#h,w,_ = tmpl.shape
-#data = numpy.zeros((h,w,3),dtype=numpy.uint8)
-#res = cv2.matchTemplate(cvframe, tmpl, cv2.TM_CCORR_NORMED, data, mask)
-#res = cv2.matchTemplate(cvframe, tmpl, cv2.TM_CCORR_NORMED)
-#min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
-# Get box
-#top_left = max_loc
-#bottom_right = (top_left[0]+w, top_left[1]+h)
-#cv2.rectangle(cvframe, top_left, bottom_right, 255, 2)
-#rect = (top_left[0],top_left[1],bottom_right[0],bottom_right[1])
-#print(rect)
-#print(max_val)
 # Display
 #cv2.imshow('cvimage', cvframe)
 #cv2.waitKey(0)
