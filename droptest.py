@@ -59,6 +59,7 @@ tmplchars = [tmpl_0,tmpl_1,tmpl_2,tmpl_3,tmpl_4,tmpl_5,tmpl_6,
              tmpl_7,tmpl_8,tmpl_9,tmpl_x,tmpl_p,tmpl_l,tmpl_r]
 tmplmasks = [tmpl_0m,tmpl_1m,tmpl_2m,tmpl_3m,tmpl_4m,tmpl_5m,tmpl_6m,
              tmpl_7m,tmpl_8m,tmpl_9m,tmpl_xm,tmpl_pm,tmpl_lm,tmpl_rm]
+# I used this as a global variable... shame.. too lazy atm to pass it as a variable
 tmpl_correction = 0.8/np.array([.8,.89,.85,.83,.86,.81,.8,.9,.85,.83,.8,.83,.8,.8])
 
 tmpl_tol = 0.97
@@ -85,7 +86,6 @@ def corrtmplgray(cvwnd,tmpl,mask):
   min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
   return max_val, max_loc
 
-
 def maxcorrtmpl(cvwnd,templates,masks):
   corr = np.zeros(len(templates))
   xloc = []
@@ -106,6 +106,7 @@ def matchtext(cvwnd,tmpl2char,tmpls,masks):
   cvparse = np.copy(cvwnd)
   chars = []
   locs = []
+  # Turn this into something recursive or something...
   for i in range(7): # sometimes it gets stuck in a loop
     index, loc = maxcorrtmpl(cvparse,tmpls,masks)
     if index == -1:
@@ -114,15 +115,26 @@ def matchtext(cvwnd,tmpl2char,tmpls,masks):
       chars.append(tmpl2char[index])
       locs.append(loc)
       # remove the block for next iteration
-      cvparse[:,loc:loc+tmpls[index].shape[1]] = np.random.randint(0,255,(14,tmpls[index].shape[1]),dtype=np.uint8)
-      #cvparse = np.hstack((cvparse[:,:loc],cvparse[:,loc+tmpls[index].shape[1]:]))
+      #cvparse[:,loc:loc+tmpls[index].shape[1]] = np.random.randint(0,255,(14,tmpls[index].shape[1]),dtype=np.uint8)
+      cvparse = np.hstack((cvparse[:,:loc],cvparse[:,loc+tmpls[index].shape[1]:]))
     print(chars,locs)
     plt.imshow(cvparse)
+    # need to figure out a way to unsort the locations
   return chars, locs
   
+def matchtextrec(cvwnd,tmpl2char,tmpls,masks):
+  # Turn this into a binary search or something...
+  for i in range(7): # sometimes it gets stuck in a loop
+    index, loc = maxcorrtmpl(cvwnd,tmpls,masks)
+    if index == -1:
+      return ''
+    else:
+      # remove the block for next iteration
+      #cvparse[:,loc:loc+tmpls[index].shape[1]] = np.random.randint(0,255,(14,tmpls[index].shape[1]),dtype=np.uint8)
+      return matchtextrec(cvwnd[:,:loc+1],tmpl2char,tmpls,masks) + tmpl2char[index] + matchtextrec(cvwnd[:,loc-1+tmpls[index].shape[1]:],tmpl2char,tmpls,masks)
 
 # Load image
-i = 311
+i = 420
 fname = os.path.join('data',dropfiles[i])
 label = droplabels[i]
 
@@ -191,9 +203,10 @@ cvgray = np.array(pgray)
 cv2.imwrite(os.path.join('test','ocr'+dropfiles[i]), cvgray)
 # thresholding sucks, use templates with masks instead
 
-chars, locs = matchtext(cvgray,tmpl2char,tmplchars,tmplmasks)
-zipped = zip(chars,locs)
-droptext = ''.join([i for i, j in sorted(zipped, key=lambda t: t[1])])
+#chars, locs = matchtext(cvgray,tmpl2char,tmplchars,tmplmasks)
+#zipped = zip(chars,locs)
+#droptext = ''.join([i for i, j in sorted(zipped, key=lambda t: t[1])])
+droptext = matchtextrec(cvgray,tmpl2char,tmplchars,tmplmasks)
 print(droptext)
 
 # List of location windows
